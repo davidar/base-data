@@ -4,23 +4,49 @@
 import scraperwiki
 import lxml.html
 
-for url in open('urls.txt','r'):
+import urlparse
+import httplib
+
+# Recursively follow redirects until there isn't a location header
+# http://www.zacwitte.com/resolving-http-redirects-in-python
+def resolve_http_redirect(url, depth=0):
+    if depth > 10:
+        raise Exception("Redirected "+depth+" times, giving up.")
+    o = urlparse.urlparse(url,allow_fragments=True)
+    conn = httplib.HTTPConnection(o.netloc)
+    path = o.path
+    if o.query:
+        path +='?'+o.query
+    conn.request("HEAD", path)
+    res = conn.getresponse()
+    headers = dict(res.getheaders())
+    if headers.has_key('location') and headers['location'] != url:
+        return resolve_http_redirect(headers['location'], depth+1)
+    else:
+        return url
+
+for url0 in open('urls.txt','r'):
 	try:
 		# Read in a page
-		url = url.strip()
+		url0 = url0.strip()
+		print url0
+		url = resolve_http_redirect(url0)
+		print url
 		html = scraperwiki.scrape(url)
 
 		# Find something on the page using css selectors
 		root = lxml.html.fromstring(html)
+		root.make_links_absolute(url)
 		pdfs = set()
 		for a in root.cssselect('a'):
 			href = a.get('href')
 			if href and 'pdf' in href: pdfs.add(href)
-		print url, pdfs
+		print pdfs
+		print
 
 		# Write out to the sqlite database using scraperwiki library
 		for pdf in pdfs:
-			scraperwiki.sqlite.save(unique_keys=['pdf'], data={"pdf": pdf, "url": url})
+			scraperwiki.sqlite.save(unique_keys=['pdf'], data={"pdf": pdf, "url": url, "url0": url0})
 	except Exception as e:
 		print e
 		#break
