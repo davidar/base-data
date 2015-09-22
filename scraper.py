@@ -40,7 +40,7 @@ for url0 in open('urls.txt','r'):
 		pdfs = set()
 		for a in root.cssselect('a'):
 			href = a.get('href')
-			if href and 'pdf' in href: pdfs.add(href)
+			if href and 'pdf' in href.lower(): pdfs.add(href)
 		print pdfs
 		print
 
